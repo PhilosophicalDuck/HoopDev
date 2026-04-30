@@ -1,0 +1,51 @@
+# Environment / secrets
+.env
+.env.local
+app/frontend/.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# Model weights (large binaries — store in releases or cloud storage)
+*.pt
+*.pth
+*.onnx
+
+# Database
+*.db
+*.sqlite3
+
+# YOLO training outputs
+runs/
+
+# Dataset (downloaded via Roboflow)
+Basketball-Players-17/
+
+# Generated highlights
+highlights/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude Code local settings
+.claude/
+
+# IDE
+.vscode/
+.idea/
+
+# Node
+app/frontend/node_modules/
+app/frontend/dist/
