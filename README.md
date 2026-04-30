@@ -204,18 +204,31 @@ cp .env.example .env
 
 Open `.env` and set a real `SECRET_KEY` (any long random string). The other defaults work out of the box.
 
-### 3. Add model weights
+### 3. Download model weights
 
-Download or copy your `.pt` model files into the `models/` folder:
+The model weights are not stored in the repository (too large for git). There are two custom-trained models and one standard Ultralytics model.
+
+**Custom-trained models** — download from the [Releases page](https://github.com/PhilosophicalDuck/HoopDev/releases) and place them in the `models/` folder:
+
+| File | Size | Description |
+|------|------|-------------|
+| `best_yolos_player_detection.pt` | ~23 MB | Main detection model (ball, players, hoop) |
+| `best_yolo26s_player_detection.pt` | ~23 MB | Dedicated hoop detection model |
+
+**Pose model** — downloaded automatically by Ultralytics the first time the app runs:
+
+| File | Size | Description |
+|------|------|-------------|
+| `yolo11n-pose.pt` | ~7 MB | Body keypoint estimation (17 joints) |
+
+Your `models/` folder should look like this before running:
 
 ```
 models/
 ├── best_yolos_player_detection.pt
 ├── best_yolo26s_player_detection.pt
-└── yolo11n-pose.pt
+└── yolo11n-pose.pt          ← auto-downloaded on first run if missing
 ```
-
-`yolo11n-pose.pt` can be downloaded automatically by Ultralytics on first run.
 
 ### 4. Install and run the frontend
 
