@@ -32,12 +32,22 @@ Basketball-Players-17/
 # Generated highlights
 highlights/
 
+# Generated demo output
+demos/output/
+
+# Large demo video files
+app/frontend/public/demo/*.mp4
+
 # Jupyter
 .ipynb_checkpoints/
 
 # OS
 .DS_Store
 Thumbs.db
+*.stackdump
+
+# Input videos (large media files)
+input_videos/
 
 # Claude Code local settings
 .claude/

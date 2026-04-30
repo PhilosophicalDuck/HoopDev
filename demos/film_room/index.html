@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Film Room — Basketball Analytics</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            court: {
+              900: '#0a0e1a',
+              800: '#111827',
+              700: '#1f2937',
+              600: '#374151',
+            },
+            hoop: {
+              500: '#f97316',
+              400: '#fb923c',
+              300: '#fdba74',
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    body { background-color: #0a0e1a; }
+
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #111827; }
+    ::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #f97316; }
+
+    /* Chat bubble animation */
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .msg-enter { animation: slideUp 0.25s ease-out forwards; }
+
+    /* Typing dots */
+    @keyframes blink { 0%,80%,100%{opacity:0} 40%{opacity:1} }
+    .dot { animation: blink 1.4s infinite; }
+    .dot:nth-child(2) { animation-delay: 0.2s; }
+    .dot:nth-child(3) { animation-delay: 0.4s; }
+
+    /* Glow effect */
+    .glow-orange { box-shadow: 0 0 20px rgba(249,115,22,0.25); }
+
+    /* Dropdown */
+    select option { background: #1f2937; color: #f9fafb; }
+
+    /* Chart canvas */
+    canvas { max-height: 260px; }
+
+    /* Stat card hover */
+    .stat-card { transition: transform 0.15s ease, box-shadow 0.15s ease; }
+    .stat-card:hover { transform: translateY(-2px); box-shadow: 0 4px 20px rgba(249,115,22,0.2); }
+
+    /* Persona badge */
+    .persona-sully { border-color: #6366f1; }
+    .persona-buddy  { border-color: #22c55e; }
+  </style>
+</head>
+<body class="text-gray-100 font-sans h-screen flex flex-col overflow-hidden">
+
+  <!-- ═══════════════════════  HEADER  ═══════════════════════ -->
+  <header class="flex items-center justify-between px-6 py-3 bg-court-800 border-b border-court-600 shrink-0 z-20">
+    <!-- Logo -->
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 rounded-full bg-hoop-500 flex items-center justify-center glow-orange">
+        <!-- Basketball SVG -->
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white" class="w-5 h-5">
+          <circle cx="12" cy="12" r="10" fill="none" stroke="white" stroke-width="1.5"/>
+          <path d="M12 2 C12 2 8 7 8 12 C8 17 12 22 12 22" stroke="white" stroke-width="1.5" fill="none"/>
+          <path d="M12 2 C12 2 16 7 16 12 C16 17 12 22 12 22" stroke="white" stroke-width="1.5" fill="none"/>
+          <line x1="2" y1="12" x2="22" y2="12" stroke="white" stroke-width="1.5"/>
+        </svg>
+      </div>
+      <div>
+        <h1 class="text-sm font-bold tracking-widest uppercase text-white">Film Room</h1>
+        <p class="text-xs text-gray-500 -mt-0.5">Basketball Analytics</p>
+      </div>
+    </div>
+
+    <!-- Centre controls -->
+    <div class="flex items-center gap-3">
+      <!-- View Dropdown -->
+      <div class="flex flex-col gap-0.5">
+        <label class="text-xs text-gray-500 ml-1">View</label>
+        <div class="relative">
+          <select id="viewSelect"
+            class="appearance-none bg-court-700 border border-court-600 text-white text-sm rounded-lg
+                   pl-3 pr-8 py-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-hoop-500
+                   hover:border-hoop-500 transition-colors min-w-[180px]"
+            onchange="handleViewChange(this.value)">
+            <option value="live_session">🔴 Live Session</option>
+            <option value="release_angle">Release Angle</option>
+            <option value="knee_flexion">Knee Flexion</option>
+            <option value="elbow_angle">Elbow Angle</option>
+            <option value="shot_arc">Shot Arc</option>
+            <option value="fatigue">Fatigue Tracking</option>
+            <option value="overview">Session Overview</option>
+          </select>
+          <svg class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
+               fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Session badge -->
+      <div class="flex items-center gap-2 bg-court-700 rounded-lg px-3 py-2 border border-court-600">
+        <span class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
+        <span class="text-xs text-gray-300 font-mono">Session #42 &nbsp;·&nbsp; 127 shots</span>
+      </div>
+    </div>
+
+    <!-- Persona Dropdown -->
+    <div class="flex flex-col gap-0.5">
+      <label class="text-xs text-gray-500 ml-1">Coach Persona</label>
+      <div class="relative" id="personaWrapper">
+        <select id="personaSelect"
+          class="appearance-none bg-court-700 border-2 border-indigo-500 text-white text-sm rounded-lg
+                 pl-3 pr-8 py-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-400
+                 hover:border-indigo-400 transition-colors min-w-[200px]"
+          onchange="handlePersonaChange(this.value)">
+          <option value="sully">🏆 Coach Sully — Old School</option>
+          <option value="buddy">⚡ Buddy — High Energy</option>
+        </select>
+        <svg class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
+             fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+        </svg>
+      </div>
+    </div>
+  </header>
+
+  <!-- ═══════════════════════  LIVE SESSION PANEL  ═══════════════════════ -->
+  <div id="liveSessionPanel" class="flex flex-1 overflow-hidden">
+    <!-- Camera area -->
+    <div class="flex-1 relative bg-black overflow-hidden">
+
+      <!-- Connecting overlay -->
+      <div id="ls-connecting" class="absolute inset-0 flex flex-col items-center justify-center gap-4 z-10">
+        <div class="ls-spinner"></div>
+        <p class="text-gray-400 text-sm">Connecting to camera…</p>
+      </div>
+
+      <!-- Video feed (hidden until active) -->
+      <video id="ls-video" class="w-full h-full object-cover" loop playsinline muted
+             style="display:none">
+        <source src="../../app/frontend/public/demo/shooting_h264.mp4" type="video/mp4" />
+      </video>
+
+      <!-- Coaching cue overlay -->
+      <div class="absolute inset-0 pointer-events-none flex flex-col justify-between p-4 z-20">
+        <!-- Top: active cue -->
+        <div class="flex justify-center">
+          <div id="ls-cue-banner" class="hidden max-w-md w-full rounded-xl border px-4 py-3 shadow-2xl ls-cue-anim">
+            <p id="ls-cue-text"  class="font-bold text-lg leading-tight text-white"></p>
+            <p class="text-xs opacity-70 mt-0.5 text-white">Tap for details</p>
+          </div>
+        </div>
+        <!-- Bottom: cue history -->
+        <div id="ls-cue-history" class="flex flex-col gap-1"></div>
+      </div>
+    </div>
+
+    <!-- Right sidebar -->
+    <aside class="w-72 bg-gray-950 border-l border-gray-800 flex flex-col gap-4 p-4 overflow-y-auto shrink-0">
+
+      <!-- Timer -->
+      <div class="bg-gray-900 rounded-xl p-4 text-center">
+        <p class="text-gray-400 text-xs uppercase tracking-wider mb-1">Shooting Drill</p>
+        <p id="ls-timer" class="font-mono text-4xl font-bold text-white tracking-widest">00:00</p>
+      </div>
+
+      <!-- Metrics -->
+      <div class="bg-gray-900 rounded-xl p-4">
+        <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Live Metrics</h3>
+        <div class="space-y-0">
+          <div class="flex justify-between items-center py-2 border-b border-gray-800">
+            <span class="text-gray-400 text-sm">🏀 Field Goal %</span>
+            <span id="ls-fg" class="font-mono font-bold text-base text-gray-500">—</span>
+          </div>
+          <div class="flex justify-between items-center py-2 border-b border-gray-800">
+            <span class="text-gray-400 text-sm">💪 Elbow Angle</span>
+            <span id="ls-elbow" class="font-mono font-bold text-base text-gray-500">—</span>
+          </div>
+          <div class="flex justify-between items-center py-2 border-b border-gray-800">
+            <span class="text-gray-400 text-sm">🎯 Shot State</span>
+            <span id="ls-state" class="font-mono font-bold text-base text-gray-500">—</span>
+          </div>
+          <div class="flex justify-between items-center py-2 border-b border-gray-800">
+            <span class="text-gray-400 text-sm">⚡ Speed</span>
+            <span id="ls-speed" class="font-mono font-bold text-base text-gray-500">—</span>
+          </div>
+          <div class="flex justify-between items-center py-2 border-b border-gray-800">
+            <span class="text-gray-400 text-sm">🟠 Ball</span>
+            <span id="ls-ball" class="font-mono font-bold text-base text-gray-500">—</span>
+          </div>
+          <div class="flex justify-between items-center py-2">
+            <span class="text-gray-400 text-sm">🔵 Hoop</span>
+            <span id="ls-hoop" class="font-mono font-bold text-base text-gray-500">—</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Controls -->
+      <div id="ls-controls" class="bg-gray-900 rounded-xl p-4 text-center">
+        <p class="text-gray-500 text-sm">Connecting to camera…</p>
+      </div>
+
+      <!-- Quick tip -->
+      <div class="bg-gray-900 rounded-xl p-3 mt-auto">
+        <p class="text-xs text-gray-500">
+          Development tips appear automatically above the camera feed. Tap any tip for details.
+        </p>
+      </div>
+    </aside>
+  </div>
+
+  <!-- ═══════════════════════  MAIN LAYOUT  ═══════════════════════ -->
+  <main id="filmRoomPanel" class="flex flex-1 overflow-hidden">
+
+    <!-- ───────────────  LEFT: DATA DISPLAY  ─────────────── -->
+    <section class="flex flex-col flex-1 overflow-y-auto p-5 gap-5 min-w-0">
+
+      <!-- Stat Cards Row -->
+      <div class="grid grid-cols-4 gap-4 shrink-0">
+        <div class="stat-card bg-court-800 border border-court-600 rounded-xl p-4 flex flex-col gap-1">
+          <p class="text-xs text-gray-500 uppercase tracking-wider">Avg Release Angle</p>
+          <p class="text-3xl font-bold text-hoop-400">47.2°</p>
+          <p class="text-xs text-green-400">▲ 2.1° vs last session</p>
+        </div>
+        <div class="stat-card bg-court-800 border border-court-600 rounded-xl p-4 flex flex-col gap-1">
+          <p class="text-xs text-gray-500 uppercase tracking-wider">Field Goal %</p>
+          <p class="text-3xl font-bold text-white">61%</p>
+          <p class="text-xs text-green-400">▲ 4% vs last session</p>
+        </div>
+        <div class="stat-card bg-court-800 border border-court-600 rounded-xl p-4 flex flex-col gap-1">
+          <p class="text-xs text-gray-500 uppercase tracking-wider">Avg Knee Flexion</p>
+          <p class="text-3xl font-bold text-indigo-400">82°</p>
+          <p class="text-xs text-red-400">▼ 3° vs last session</p>
+        </div>
+        <div class="stat-card bg-court-800 border border-court-600 rounded-xl p-4 flex flex-col gap-1">
+          <p class="text-xs text-gray-500 uppercase tracking-wider">Fatigue Index</p>
+          <p class="text-3xl font-bold text-yellow-400">34%</p>
+          <p class="text-xs text-gray-400">Low — optimal range</p>
+        </div>
+      </div>
+
+      <!-- Chart + Secondary Info Row -->
+      <div class="flex gap-4 flex-1 min-h-0">
+
+        <!-- Main Chart -->
+        <div class="flex-1 bg-court-800 border border-court-600 rounded-xl p-5 flex flex-col gap-3 min-w-0">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 id="chartTitle" class="text-base font-semibold text-white">Release Angle Over Session</h2>
+              <p id="chartSubtitle" class="text-xs text-gray-500 mt-0.5">Shot-by-shot trajectory — optimal band: 43°–52°</p>
+            </div>
+            <div class="flex gap-2">
+              <button onclick="setChartRange('all')"   class="text-xs bg-court-700 hover:bg-hoop-500 px-3 py-1 rounded-md transition-colors" id="btn-all">All</button>
+              <button onclick="setChartRange('first')" class="text-xs bg-court-700 hover:bg-hoop-500 px-3 py-1 rounded-md transition-colors" id="btn-first">First half</button>
+              <button onclick="setChartRange('last')"  class="text-xs bg-court-700 hover:bg-hoop-500 px-3 py-1 rounded-md transition-colors" id="btn-last">Last half</button>
+            </div>
+          </div>
+          <div class="relative flex-1 min-h-[220px]">
+            <canvas id="mainChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Shot Heatmap / Sidebar Panel -->
+        <div class="w-56 bg-court-800 border border-court-600 rounded-xl p-4 flex flex-col gap-3 shrink-0">
+          <h3 class="text-sm font-semibold text-gray-300 uppercase tracking-wider">Zone Accuracy</h3>
+          <!-- Mini court grid -->
+          <div class="grid grid-cols-3 gap-1.5 flex-1">
+            <!-- Row: three-point -->
+            <div class="rounded-lg p-2 text-center bg-red-900/40 border border-red-800/50"><p class="text-xs text-gray-400">Left 3</p><p class="font-bold text-red-400 text-sm">38%</p></div>
+            <div class="rounded-lg p-2 text-center bg-yellow-900/40 border border-yellow-800/50"><p class="text-xs text-gray-400">Top 3</p><p class="font-bold text-yellow-400 text-sm">51%</p></div>
+            <div class="rounded-lg p-2 text-center bg-yellow-900/40 border border-yellow-800/50"><p class="text-xs text-gray-400">Right 3</p><p class="font-bold text-yellow-400 text-sm">48%</p></div>
+            <!-- Row: mid-range -->
+            <div class="rounded-lg p-2 text-center bg-green-900/40 border border-green-800/50"><p class="text-xs text-gray-400">L Mid</p><p class="font-bold text-green-400 text-sm">67%</p></div>
+            <div class="rounded-lg p-2 text-center bg-green-900/40 border border-green-800/50"><p class="text-xs text-gray-400">Elbow</p><p class="font-bold text-green-400 text-sm">71%</p></div>
+            <div class="rounded-lg p-2 text-center bg-green-900/40 border border-green-800/50"><p class="text-xs text-gray-400">R Mid</p><p class="font-bold text-green-400 text-sm">63%</p></div>
+            <!-- Row: paint -->
+            <div class="rounded-lg p-2 text-center bg-blue-900/40 border border-blue-800/50"><p class="text-xs text-gray-400">L Block</p><p class="font-bold text-blue-400 text-sm">74%</p></div>
+            <div class="rounded-lg p-2 text-center bg-blue-900/40 border border-blue-800/50 col-span-1"><p class="text-xs text-gray-400">Paint</p><p class="font-bold text-blue-400 text-sm">80%</p></div>
+            <div class="rounded-lg p-2 text-center bg-blue-900/40 border border-blue-800/50"><p class="text-xs text-gray-400">R Block</p><p class="font-bold text-blue-400 text-sm">77%</p></div>
+          </div>
+          <div class="border-t border-court-600 pt-2">
+            <p class="text-xs text-gray-500">Best zone: Paint (80%)</p>
+            <p class="text-xs text-gray-500">Weakest: Left 3 (38%)</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom: Skeleton / Form Breakdown -->
+      <div class="bg-court-800 border border-court-600 rounded-xl p-5 shrink-0">
+        <h3 class="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-3">Shot Form Breakdown — Last 5 shots</h3>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-gray-500 text-xs uppercase tracking-wider border-b border-court-600">
+                <th class="text-left pb-2 pr-4">Shot #</th>
+                <th class="text-left pb-2 pr-4">Release Angle</th>
+                <th class="text-left pb-2 pr-4">Elbow Angle</th>
+                <th class="text-left pb-2 pr-4">Knee Flexion</th>
+                <th class="text-left pb-2 pr-4">Arc</th>
+                <th class="text-left pb-2 pr-4">Follow-Through</th>
+                <th class="text-left pb-2">Result</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-court-600">
+              <tr class="hover:bg-court-700/50 transition-colors">
+                <td class="py-2 pr-4 text-gray-400 font-mono">#127</td>
+                <td class="py-2 pr-4 text-green-400">49.1°</td>
+                <td class="py-2 pr-4 text-green-400">88°</td>
+                <td class="py-2 pr-4 text-yellow-400">79°</td>
+                <td class="py-2 pr-4 text-green-400">47°</td>
+                <td class="py-2 pr-4"><span class="bg-green-900/50 text-green-400 px-2 py-0.5 rounded text-xs">Good</span></td>
+                <td class="py-2"><span class="bg-green-500 text-white px-2 py-0.5 rounded text-xs font-bold">MADE</span></td>
+              </tr>
+              <tr class="hover:bg-court-700/50 transition-colors">
+                <td class="py-2 pr-4 text-gray-400 font-mono">#126</td>
+                <td class="py-2 pr-4 text-red-400">38.2°</td>
+                <td class="py-2 pr-4 text-orange-400">102°</td>
+                <td class="py-2 pr-4 text-green-400">84°</td>
+                <td class="py-2 pr-4 text-red-400">33°</td>
+                <td class="py-2 pr-4"><span class="bg-red-900/50 text-red-400 px-2 py-0.5 rounded text-xs">Dropped</span></td>
+                <td class="py-2"><span class="bg-red-700 text-white px-2 py-0.5 rounded text-xs font-bold">MISS</span></td>
+              </tr>
+              <tr class="hover:bg-court-700/50 transition-colors">
+                <td class="py-2 pr-4 text-gray-400 font-mono">#125</td>
+                <td class="py-2 pr-4 text-green-400">46.8°</td>
+                <td class="py-2 pr-4 text-green-400">91°</td>
+                <td class="py-2 pr-4 text-green-400">86°</td>
+                <td class="py-2 pr-4 text-green-400">45°</td>
+                <td class="py-2 pr-4"><span class="bg-green-900/50 text-green-400 px-2 py-0.5 rounded text-xs">Good</span></td>
+                <td class="py-2"><span class="bg-green-500 text-white px-2 py-0.5 rounded text-xs font-bold">MADE</span></td>
+              </tr>
+              <tr class="hover:bg-court-700/50 transition-colors">
+                <td class="py-2 pr-4 text-gray-400 font-mono">#124</td>
+                <td class="py-2 pr-4 text-yellow-400">43.1°</td>
+                <td class="py-2 pr-4 text-green-400">89°</td>
+                <td class="py-2 pr-4 text-red-400">71°</td>
+                <td class="py-2 pr-4 text-yellow-400">43°</td>
+                <td class="py-2 pr-4"><span class="bg-green-900/50 text-green-400 px-2 py-0.5 rounded text-xs">Good</span></td>
+                <td class="py-2"><span class="bg-green-500 text-white px-2 py-0.5 rounded text-xs font-bold">MADE</span></td>
+              </tr>
+              <tr class="hover:bg-court-700/50 transition-colors">
+                <td class="py-2 pr-4 text-gray-400 font-mono">#123</td>
+                <td class="py-2 pr-4 text-orange-400">41.5°</td>
+                <td class="py-2 pr-4 text-orange-400">105°</td>
+                <td class="py-2 pr-4 text-yellow-400">80°</td>
+                <td class="py-2 pr-4 text-red-400">36°</td>
+                <td class="py-2 pr-4"><span class="bg-red-900/50 text-red-400 px-2 py-0.5 rounded text-xs">Dropped</span></td>
+                <td class="py-2"><span class="bg-red-700 text-white px-2 py-0.5 rounded text-xs font-bold">MISS</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </section><!-- end data panel -->
+
+    <!-- ───────────────  RIGHT: CHAT INTERFACE  ─────────────── -->
+    <aside class="w-96 bg-court-800 border-l border-court-600 flex flex-col shrink-0">
+
+      <!-- Chat Header -->
+      <div id="chatHeader"
+           class="flex items-center gap-3 px-4 py-3 border-b border-court-600 shrink-0 bg-indigo-900/20">
+        <div id="coachAvatar"
+             class="w-10 h-10 rounded-full border-2 border-indigo-500 flex items-center justify-center text-lg shrink-0 bg-court-700">
+          🏆
+        </div>
+        <div class="min-w-0">
+          <p id="coachName" class="font-semibold text-white text-sm">Coach Sully</p>
+          <p id="coachTagline" class="text-xs text-gray-400 truncate">Hall-of-Famer · Direct &amp; Disciplined</p>
+        </div>
+        <div class="ml-auto shrink-0">
+          <span class="text-xs bg-indigo-900/60 text-indigo-300 px-2 py-1 rounded-full border border-indigo-700">
+            Old School
+          </span>
+        </div>
+      </div>
+
+      <!-- Messages -->
+      <div id="chatMessages" class="flex-1 overflow-y-auto p-4 space-y-3">
+        <!-- Greeting injected by JS -->
+      </div>
+
+      <!-- Input -->
+      <div class="p-3 border-t border-court-600 shrink-0">
+        <div class="flex gap-2 items-end">
+          <textarea id="chatInput"
+            rows="2"
+            placeholder="Ask about the data…"
+            class="flex-1 bg-court-700 border border-court-600 text-gray-100 text-sm rounded-xl
+                   px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-hoop-500
+                   placeholder-gray-600 leading-snug"
+            onkeydown="handleKey(event)"></textarea>
+          <button onclick="sendMessage()"
+            class="bg-hoop-500 hover:bg-hoop-400 text-white rounded-xl px-4 py-3 text-sm font-semibold
+                   transition-colors shrink-0 glow-orange flex items-center gap-1.5">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+            </svg>
+            Send
+          </button>
+        </div>
+        <p class="text-xs text-gray-600 mt-1.5 ml-1">
+          Tip: Ask about trends, weak zones, or form corrections.
+        </p>
+      </div>
+
+    </aside>
+
+  </main>
+
+  <!-- ═══════════════════════  SCRIPTS  ═══════════════════════ -->
+  <!-- live session styles injected here -->
+  <style>
+    @keyframes lsSpin { to { transform: rotate(360deg); } }
+    .ls-spinner {
+      width: 40px; height: 40px; border-radius: 50%;
+      border: 3px solid #374151; border-top-color: #f97316;
+      animation: lsSpin 0.9s linear infinite;
+    }
+    @keyframes lsCuePop { from { opacity:0; transform:translateY(-8px); } to { opacity:1; transform:translateY(0); } }
+    .ls-cue-anim { animation: lsCuePop 0.25s ease-out forwards; }
+    #liveSessionPanel { display: none; }
+    #liveSessionPanel.ls-visible { display: flex; }
+    #ls-cue-banner.hidden { display: none; }
+  </style>
+  <script>
+    // ── DATA ────────────────────────────────────────────────────
+    const SESSION_DATA = {
+      release_angle: {
+        labels: Array.from({length: 40}, (_, i) => `S${i+1}`),
+        values: Array.from({length: 40}, () => 38 + Math.random() * 18),
+        title:  "Release Angle Over Session",
+        sub:    "Shot-by-shot trajectory — optimal band: 43°–52°",
+        unit:   "°",
+        min: 30, max: 65,
+        zones: [{y: 43, label: "Min ideal"}, {y: 52, label: "Max ideal"}]
+      },
+      knee_flexion: {
+        labels: Array.from({length: 40}, (_, i) => `S${i+1}`),
+        values: Array.from({length: 40}, () => 70 + Math.random() * 22),
+        title:  "Knee Flexion Over Session",
+        sub:    "Lower flexion late in session may signal fatigue — target: 80°–95°",
+        unit:   "°",
+        min: 55, max: 105,
+        zones: [{y: 80, label: "Min ideal"}, {y: 95, label: "Max ideal"}]
+      },
+      elbow_angle: {
+        labels: Array.from({length: 40}, (_, i) => `S${i+1}`),
+        values: Array.from({length: 40}, () => 78 + Math.random() * 28),
+        title:  "Elbow Angle at Release",
+        sub:    "Elbow should be tucked at 80°–100° at the point of release",
+        unit:   "°",
+        min: 60, max: 130,
+        zones: [{y: 80, label: "Min ideal"}, {y: 100, label: "Max ideal"}]
+      },
+      shot_arc: {
+        labels: Array.from({length: 40}, (_, i) => `S${i+1}`),
+        values: Array.from({length: 40}, () => 38 + Math.random() * 20),
+        title:  "Shot Arc Angle",
+        sub:    "Optimal entry angle: 45°–55° for maximum hoop margin",
+        unit:   "°",
+        min: 30, max: 65,
+        zones: [{y: 45, label: "Min ideal"}, {y: 55, label: "Max ideal"}]
+      },
+      fatigue: {
+        labels: Array.from({length: 40}, (_, i) => `S${i+1}`),
+        values: Array.from({length: 40}, (_, i) => Math.min(15 + i * 1.8 + Math.random() * 8, 95)),
+        title:  "Fatigue Index Over Session",
+        sub:    "Derived from declining cadence, form degradation & velocity drop",
+        unit:   "%",
+        min: 0, max: 100,
+        zones: [{y: 60, label: "Caution zone"}, {y: 80, label: "High fatigue"}]
+      },
+      overview: {
+        labels: ['Release°', 'Knee°', 'Elbow°', 'Arc°', 'FG%', 'Fatigue%'],
+        values: [47.2, 82, 90, 47.5, 61, 34],
+        title:  "Session Overview — Key Metrics",
+        sub:    "Normalised snapshot of all tracked metrics this session",
+        unit:   "",
+        min: 0, max: 100,
+        zones: []
+      }
+    };
+
+    let currentView = 'release_angle';
+    let mainChart   = null;
+
+    // ── PERSONAS ────────────────────────────────────────────────
+    const PERSONAS = {
+      sully: {
+        name:    "Coach Sully",
+        tagline: "Hall-of-Famer · Direct & Disciplined",
+        emoji:   "🏆",
+        badge:   "Old School",
+        headerBg: "bg-indigo-900/20",
+        borderClass: "border-indigo-500",
+        badgeClass: "bg-indigo-900/60 text-indigo-300 border-indigo-700",
+        greeting: "I've looked at your numbers. 47.2° average release — that's acceptable, not great. Shot #126 had a 38° release angle. That's a flat brick. Fix the elbow flare. Discipline wins games.",
+        responses: {
+          default: [
+            "Look at the data. Your release angle dropped 4° in the last third of the session. That's fatigue or mental slippage — both are fixable with discipline.",
+            "Shot #126 — 38° release, elbow at 102°. That's textbook poor mechanics. We run that drill again tomorrow until it's automatic.",
+            "Your left-three percentage is 38%. That's not a slump, that's a technique deficiency. We address it systematically, not emotionally.",
+            "Your FG% in the paint is 80%. That's your best zone. Use it. Good players know their strengths.",
+            "I don't want to hear about luck. 61% from the field is the result of consistent mechanics. Maintain that knee flexion above 80° and it holds.",
+          ],
+          release: [
+            "47.2° average release. The optimal window is 43°–52°. You're in range but drifting low late in sessions. Watch shot #123 through #127 — the trend is clear. Fix it before it becomes a habit.",
+          ],
+          knee: [
+            "Knee flexion dropped to 71° on shot #124. That's a red flag. Low knee flexion kills your power generation. You're shooting with arms instead of legs. Fix the base first.",
+          ],
+          fatigue: [
+            "Your fatigue index hits 60% around shot #85. That's where your form breaks down. We either condition harder, or we cap drill volume at 80 shots until your base is stronger.",
+          ],
+        }
+      },
+      buddy: {
+        name:    "Buddy",
+        tagline: "High Energy · Your Biggest Fan",
+        emoji:   "⚡",
+        badge:   "Encouraging",
+        headerBg: "bg-green-900/20",
+        borderClass: "border-green-500",
+        badgeClass: "bg-green-900/60 text-green-300 border-green-700",
+        greeting: "Hey! Look at that session — 127 shots and a 47.2° average release angle! That arc is looking so much cleaner than last week. I'm pumped for you! Let's dig into the highlights together 🔥",
+        responses: {
+          default: [
+            "You're trending up! Your release angle improved 2.1° compared to last session. That's the consistency we've been working toward. Keep that energy!",
+            "Shot #127 was *perfect* — 49.1° release, great elbow position, and you nailed the follow-through. That's your gold standard right there. More of that!",
+            "Hey, 61% from the field is elite territory! You should be really proud of that number. The work is paying off!",
+            "Your paint percentage is 80%! You're so strong close to the rim. Let's build on that confidence and work it into your mid-range game too!",
+            "I know shot #126 didn't go in, but look — your knee flexion was great on that one. The mechanics were there. Sometimes the ball just has other plans! Reset and fire again!",
+          ],
+          release: [
+            "Your release angle is looking so much more consistent! You stayed in the 43°–52° sweet spot for most of the session. The dip on shots #123-#126 is just fatigue — totally normal. You've clearly been putting in the reps!",
+          ],
+          knee: [
+            "Your knee flexion is solid overall — 82° average is right in the zone! That slight dip on shot #124 (71°) might just be you getting tired near the end. A little extra conditioning and that won't even be a blip!",
+          ],
+          fatigue: [
+            "Hey, a 34% fatigue index is actually really good! You stayed strong through most of the session. The tail-end dip is normal for anyone — that just means you pushed yourself. That's growth!",
+          ],
+        }
+      }
+    };
+
+    let currentPersona = 'sully';
+
+    // ── CHART SETUP ─────────────────────────────────────────────
+    function buildChart(viewKey) {
+      const d = SESSION_DATA[viewKey];
+      if (mainChart) mainChart.destroy();
+
+      const ctx = document.getElementById('mainChart').getContext('2d');
+
+      const isOverview = viewKey === 'overview';
+      const type = isOverview ? 'bar' : 'line';
+
+      // Color dots by whether value is in ideal zone
+      const pointColors = isOverview ? '#f97316' : d.values.map(v => {
+        if (d.zones.length < 2) return '#f97316';
+        return (v >= d.zones[0].y && v <= d.zones[1].y) ? '#22c55e' : '#f97316';
+      });
+
+      mainChart = new Chart(ctx, {
+        type,
+        data: {
+          labels: d.labels,
+          datasets: [{
+            label: d.title,
+            data: d.values,
+            borderColor: '#f97316',
+            backgroundColor: isOverview ? 'rgba(249,115,22,0.7)' : 'rgba(249,115,22,0.08)',
+            pointBackgroundColor: pointColors,
+            pointRadius: isOverview ? 0 : 4,
+            pointHoverRadius: 6,
+            tension: 0.35,
+            fill: !isOverview,
+            borderWidth: 2,
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#1f2937',
+              borderColor: '#374151',
+              borderWidth: 1,
+              titleColor: '#9ca3af',
+              bodyColor: '#f9fafb',
+              callbacks: {
+                label: ctx => ` ${ctx.parsed.y.toFixed(1)}${d.unit}`
+              }
+            },
+            // Ideal zone annotation drawn manually via afterDraw
+          },
+          scales: {
+            x: {
+              ticks: { color: '#6b7280', font: { size: 11 }, maxTicksLimit: 15 },
+              grid:  { color: 'rgba(55,65,81,0.5)' }
+            },
+            y: {
+              min: d.min,
+              max: d.max,
+              ticks: { color: '#6b7280', font: { size: 11 }, callback: v => v + d.unit },
+              grid: { color: 'rgba(55,65,81,0.5)' }
+            }
+          }
+        },
+        plugins: [{
+          id: 'idealZone',
+          beforeDraw(chart) {
+            if (d.zones.length < 2) return;
+            const { ctx, scales: { y, x } } = chart;
+            const y1 = y.getPixelForValue(d.zones[1].y);
+            const y2 = y.getPixelForValue(d.zones[0].y);
+            ctx.save();
+            ctx.fillStyle = 'rgba(34,197,94,0.07)';
+            ctx.fillRect(x.left, y1, x.right - x.left, y2 - y1);
+            ctx.strokeStyle = 'rgba(34,197,94,0.3)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([4, 4]);
+            ctx.beginPath(); ctx.moveTo(x.left, y1); ctx.lineTo(x.right, y1); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(x.left, y2); ctx.lineTo(x.right, y2); ctx.stroke();
+            ctx.restore();
+          }
+        }]
+      });
+    }
+
+    function handleViewChange(val) {
+      if (val === 'live_session') {
+        document.getElementById('filmRoomPanel').style.display = 'none';
+        document.getElementById('liveSessionPanel').classList.add('ls-visible');
+        startLiveSession();
+        return;
+      }
+      // Switching away from live session
+      document.getElementById('liveSessionPanel').classList.remove('ls-visible');
+      document.getElementById('filmRoomPanel').style.display = 'flex';
+      stopLiveSession();
+
+      currentView = val;
+      const d = SESSION_DATA[val];
+      document.getElementById('chartTitle').textContent    = d.title;
+      document.getElementById('chartSubtitle').textContent = d.sub;
+      buildChart(val);
+    }
+
+    function setChartRange(range) {
+      const d = { ...SESSION_DATA[currentView] };
+      const n = d.values.length;
+      if (range === 'first') {
+        d.values = d.values.slice(0, Math.floor(n/2));
+        d.labels = d.labels.slice(0, Math.floor(n/2));
+      } else if (range === 'last') {
+        d.values = d.values.slice(Math.floor(n/2));
+        d.labels = d.labels.slice(Math.floor(n/2));
+      }
+      // Rebuild with sliced data
+      if (mainChart) mainChart.destroy();
+      const savedFull = SESSION_DATA[currentView];
+      SESSION_DATA[currentView] = d;
+      buildChart(currentView);
+      SESSION_DATA[currentView] = savedFull;
+    }
+
+    // ── PERSONA SWITCH ───────────────────────────────────────────
+    function handlePersonaChange(val) {
+      currentPersona = val;
+      const p = PERSONAS[val];
+
+      // Update header
+      document.getElementById('coachAvatar').textContent   = p.emoji;
+      document.getElementById('coachName').textContent     = p.name;
+      document.getElementById('coachTagline').textContent  = p.tagline;
+      document.getElementById('chatHeader').className =
+        `flex items-center gap-3 px-4 py-3 border-b border-court-600 shrink-0 ${p.headerBg}`;
+      document.getElementById('coachAvatar').className =
+        `w-10 h-10 rounded-full border-2 ${p.borderClass} flex items-center justify-center text-lg shrink-0 bg-court-700`;
+
+      const badge = document.querySelector('#chatHeader .ml-auto span');
+      badge.textContent = p.badge;
+      badge.className = `text-xs px-2 py-1 rounded-full border ${p.badgeClass}`;
+
+      // Persona dropdown border
+      const sel = document.getElementById('personaSelect');
+      sel.className = sel.className
+        .replace(/border-\w+-\d+/g, '')
+        .trim() + (val === 'sully' ? ' border-indigo-500' : ' border-green-500');
+
+      // Clear chat and add new greeting
+      document.getElementById('chatMessages').innerHTML = '';
+      addCoachMessage(p.greeting);
+    }
+
+    // ── CHAT ─────────────────────────────────────────────────────
+    function addUserMessage(text) {
+      const div = document.createElement('div');
+      div.className = 'flex justify-end msg-enter';
+      div.innerHTML = `
+        <div class="max-w-[80%] bg-hoop-500/20 border border-hoop-500/30 text-gray-100 text-sm
+                    rounded-2xl rounded-tr-sm px-4 py-3 leading-relaxed">${escHtml(text)}</div>`;
+      document.getElementById('chatMessages').appendChild(div);
+      scrollChat();
+    }
+
+    function addCoachMessage(text) {
+      const p = PERSONAS[currentPersona];
+      const div = document.createElement('div');
+      div.className = 'flex items-start gap-2.5 msg-enter';
+      div.innerHTML = `
+        <div class="w-7 h-7 rounded-full border ${p.borderClass} flex items-center justify-center
+                    text-sm shrink-0 bg-court-700 mt-0.5">${p.emoji}</div>
+        <div class="max-w-[85%] bg-court-700 border border-court-600 text-gray-100 text-sm
+                    rounded-2xl rounded-tl-sm px-4 py-3 leading-relaxed">${escHtml(text)}</div>`;
+      document.getElementById('chatMessages').appendChild(div);
+      scrollChat();
+    }
+
+    function addTypingIndicator() {
+      const p = PERSONAS[currentPersona];
+      const div = document.createElement('div');
+      div.id = 'typingIndicator';
+      div.className = 'flex items-start gap-2.5';
+      div.innerHTML = `
+        <div class="w-7 h-7 rounded-full border ${p.borderClass} flex items-center justify-center
+                    text-sm shrink-0 bg-court-700">${p.emoji}</div>
+        <div class="bg-court-700 border border-court-600 rounded-2xl rounded-tl-sm px-4 py-3">
+          <span class="dot inline-block w-1.5 h-1.5 rounded-full bg-gray-400 mr-1"></span>
+          <span class="dot inline-block w-1.5 h-1.5 rounded-full bg-gray-400 mr-1"></span>
+          <span class="dot inline-block w-1.5 h-1.5 rounded-full bg-gray-400"></span>
+        </div>`;
+      document.getElementById('chatMessages').appendChild(div);
+      scrollChat();
+    }
+
+    function removeTypingIndicator() {
+      const el = document.getElementById('typingIndicator');
+      if (el) el.remove();
+    }
+
+    function scrollChat() {
+      const el = document.getElementById('chatMessages');
+      el.scrollTop = el.scrollHeight;
+    }
+
+    function escHtml(s) {
+      return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function pickResponse(input) {
+      const p = PERSONAS[currentPersona];
+      const low = input.toLowerCase();
+      if (low.includes('release')) return p.responses.release[0];
+      if (low.includes('knee'))    return p.responses.knee[0];
+      if (low.includes('fatigue') || low.includes('tired')) return p.responses.fatigue[0];
+      const pool = p.responses.default;
+      return pool[Math.floor(Math.random() * pool.length)];
+    }
+
+    function sendMessage() {
+      const input = document.getElementById('chatInput');
+      const text  = input.value.trim();
+      if (!text) return;
+      input.value = '';
+
+      addUserMessage(text);
+      addTypingIndicator();
+
+      const delay = currentPersona === 'sully' ? 900 : 700;
+      setTimeout(() => {
+        removeTypingIndicator();
+        addCoachMessage(pickResponse(text));
+      }, delay + Math.random() * 400);
+    }
+
+    function handleKey(e) {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+    }
+
+    // ── INIT ─────────────────────────────────────────────────────
+    window.addEventListener('DOMContentLoaded', () => {
+      buildChart('release_angle');
+      addCoachMessage(PERSONAS[currentPersona].greeting);
+    });
+
+    // ════════════════════════════════════════════════════════════
+    //  LIVE SESSION SIMULATION
+    // ════════════════════════════════════════════════════════════
+
+    const LS = {
+      timerId:    null,   // setInterval for clock
+      metricsId:  null,   // setInterval for metric animations
+      timeouts:   [],     // all scheduled events
+      elapsed:    0,      // seconds
+      paused:     false,
+      active:     false,
+      shotsMade:  0,
+      shotsAtt:   0,
+      cueHistory: [],
+      speed:      80,
+    };
+
+    // Coaching cues: { at (seconds), text, severity, detail }
+    const LS_CUES = [
+      { at:  5, text: 'Keep your elbow tucked in',         severity: 'warning', detail: 'Your release elbow is flaring out. Drive it straight toward the basket for a cleaner arc.' },
+      { at: 14, text: 'Great release mechanics!',          severity: 'success', detail: 'Elbow angle was 91° — right in the ideal 75°–105° window. Keep that form.' },
+      { at: 22, text: 'Bend your knees on the setup',      severity: 'warning', detail: 'Low knee flexion reduces your power base. Aim for 80°–95° flexion before the jump.' },
+      { at: 31, text: 'Perfect follow-through!',           severity: 'success', detail: 'Wrist snapped above shoulder level — that carry adds backspin and softens the bounce.' },
+      { at: 40, text: 'Watch the elbow flare',             severity: 'warning', detail: 'Elbow drifted to 108° on that shot. Keep it inline with your shooting shoulder.' },
+      { at: 50, text: 'Good shot arc on that one',         severity: 'info',    detail: 'Arc measured at 48° — inside the optimal 43°–52° band. Aim to replicate this consistently.' },
+    ];
+
+    // Shot events: { at (seconds), made }
+    const LS_SHOTS = [
+      { at:  9, made: false },
+      { at: 17, made: true  },
+      { at: 26, made: false },
+      { at: 34, made: true  },
+      { at: 43, made: true  },
+      { at: 53, made: false },
+    ];
+
+    // Elbow angle flashes at release moments (1s before shot event)
+    const LS_ELBOWS = [
+      { at:  8, angle: 108 },
+      { at: 16, angle:  91 },
+      { at: 25, angle: 102 },
+      { at: 33, angle:  88 },
+      { at: 42, angle:  95 },
+      { at: 52, angle: 110 },
+    ];
+
+    function lsTimeout(fn, ms) {
+      LS.timeouts.push(setTimeout(fn, ms));
+    }
+
+    function startLiveSession() {
+      stopLiveSession();  // clear any previous run
+
+      // Reset state
+      Object.assign(LS, { elapsed:0, paused:false, active:false,
+                           shotsMade:0, shotsAtt:0, cueHistory:[], speed:80 });
+
+      // Reset UI to connecting state
+      document.getElementById('ls-connecting').style.display = 'flex';
+      document.getElementById('ls-video').style.display      = 'none';
+      document.getElementById('ls-timer').textContent        = '00:00';
+      document.getElementById('ls-fg').textContent           = '—';
+      document.getElementById('ls-fg').className             = 'font-mono font-bold text-base text-gray-500';
+      document.getElementById('ls-elbow').textContent        = '—';
+      document.getElementById('ls-elbow').className          = 'font-mono font-bold text-base text-gray-500';
+      document.getElementById('ls-state').textContent        = '—';
+      document.getElementById('ls-state').className          = 'font-mono font-bold text-base text-gray-500';
+      document.getElementById('ls-speed').textContent        = '—';
+      document.getElementById('ls-speed').className          = 'font-mono font-bold text-base text-gray-500';
+      document.getElementById('ls-ball').textContent         = '—';
+      document.getElementById('ls-ball').className           = 'font-mono font-bold text-base text-gray-500';
+      document.getElementById('ls-hoop').textContent         = '—';
+      document.getElementById('ls-hoop').className           = 'font-mono font-bold text-base text-gray-500';
+      document.getElementById('ls-controls').innerHTML =
+        '<p class="text-gray-500 text-sm">Connecting to camera…</p>';
+      document.getElementById('ls-cue-banner').classList.add('hidden');
+      document.getElementById('ls-cue-history').innerHTML    = '';
+
+      // After 2s: session goes active
+      lsTimeout(() => {
+        LS.active = true;
+
+        // Show video feed
+        const vid = document.getElementById('ls-video');
+        document.getElementById('ls-connecting').style.display = 'none';
+        vid.style.display = 'block';
+        vid.play().catch(() => {});
+
+        // Show active controls
+        lsRenderControls();
+
+        // Start live indicator on header badge (reuse session badge)
+        document.querySelector('.animate-pulse').classList.add('bg-orange-400');
+
+        // Start clock
+        LS.timerId = setInterval(() => {
+          if (!LS.paused) {
+            LS.elapsed++;
+            lsUpdateTimer();
+          }
+        }, 1000);
+
+        // Start metrics animation
+        LS.metricsId = setInterval(lsTickMetrics, 250);
+
+        // Ball / hoop detected — show immediately
+        lsSet('ls-ball', 'Detected ✓',  'text-green-400');
+        lsSet('ls-hoop', 'In frame ✓',  'text-green-400');
+        lsSet('ls-state', 'TRACKING', 'text-yellow-400');
+
+        // Schedule coaching cues
+        LS_CUES.forEach(c => {
+          lsTimeout(() => lsShowCue(c.text, c.severity, c.detail), c.at * 1000);
+        });
+
+        // Schedule shot events
+        LS_SHOTS.forEach(s => {
+          lsTimeout(() => lsRecordShot(s.made), s.at * 1000);
+        });
+
+        // Schedule elbow angle flashes
+        LS_ELBOWS.forEach(e => {
+          lsTimeout(() => lsFlashElbow(e.angle), e.at * 1000);
+        });
+
+      }, 2000);
+    }
+
+    function stopLiveSession() {
+      clearInterval(LS.timerId);
+      clearInterval(LS.metricsId);
+      LS.timeouts.forEach(t => clearTimeout(t));
+      LS.timeouts = [];
+      LS.active = false;
+      const vid = document.getElementById('ls-video');
+      if (vid) { vid.pause(); vid.currentTime = 0; }
+    }
+
+    function lsPause() {
+      if (!LS.active || LS.paused) return;
+      LS.paused = true;
+      document.getElementById('ls-video').pause();
+      lsRenderControls();
+    }
+
+    function lsResume() {
+      if (!LS.active || !LS.paused) return;
+      LS.paused = false;
+      document.getElementById('ls-video').play().catch(() => {});
+      lsRenderControls();
+    }
+
+    function lsStop() {
+      stopLiveSession();
+      // Switch back to the film room review view
+      document.getElementById('viewSelect').value = 'release_angle';
+      handleViewChange('release_angle');
+    }
+
+    function lsRenderControls() {
+      const ctrl = document.getElementById('ls-controls');
+      if (LS.paused) {
+        ctrl.innerHTML = `
+          <div class="flex gap-3">
+            <button onclick="lsResume()"
+              class="flex-1 bg-green-600 hover:bg-green-500 text-white font-semibold py-3 rounded-lg transition-colors">
+              ▶ Resume
+            </button>
+            <button onclick="lsStop()"
+              class="flex-1 bg-red-700 hover:bg-red-600 text-white font-semibold py-3 rounded-lg transition-colors">
+              ⏹ Stop
+            </button>
+          </div>`;
+      } else {
+        ctrl.innerHTML = `
+          <div class="flex gap-3">
+            <button onclick="lsPause()"
+              class="flex-1 bg-yellow-600 hover:bg-yellow-500 text-white font-semibold py-3 rounded-lg transition-colors">
+              ⏸ Pause
+            </button>
+            <button onclick="lsStop()"
+              class="flex-1 bg-red-700 hover:bg-red-600 text-white font-semibold py-3 rounded-lg transition-colors">
+              ⏹ Stop
+            </button>
+          </div>`;
+      }
+    }
+
+    function lsUpdateTimer() {
+      const m = Math.floor(LS.elapsed / 60).toString().padStart(2, '0');
+      const s = (LS.elapsed % 60).toString().padStart(2, '0');
+      document.getElementById('ls-timer').textContent = `${m}:${s}`;
+    }
+
+    function lsTickMetrics() {
+      if (LS.paused || !LS.active) return;
+
+      // Speed: random walk between 40–220 px/s
+      LS.speed += (Math.random() - 0.5) * 30;
+      LS.speed  = Math.max(40, Math.min(220, LS.speed));
+      lsSet('ls-speed', `${Math.round(LS.speed)} px/s`,
+        LS.speed >= 30 && LS.speed <= 300 ? 'text-green-400' : 'text-yellow-400');
+
+      // Shot state cycles slowly
+      const phase = Math.floor(Date.now() / 2000) % 3;
+      const states = ['TRACKING', 'TRACKING', 'RELEASE'];
+      const colors  = ['text-yellow-400', 'text-yellow-400', 'text-orange-400'];
+      lsSet('ls-state', states[phase], colors[phase]);
+    }
+
+    function lsFlashElbow(angle) {
+      if (!LS.active) return;
+      const inRange = angle >= 75 && angle <= 105;
+      const pct = !inRange ? (angle < 75 ? (75 - angle)/75 : (angle - 105)/105) : 0;
+      const cls = inRange ? 'text-green-400' : (pct > 0.25 ? 'text-red-400' : 'text-yellow-400');
+      lsSet('ls-elbow', `${angle}°`, cls);
+      // Fade back to — after 2s
+      setTimeout(() => {
+        if (LS.active) lsSet('ls-elbow', '—', 'text-gray-500');
+      }, 2000);
+    }
+
+    function lsRecordShot(made) {
+      if (!LS.active) return;
+      LS.shotsAtt++;
+      if (made) LS.shotsMade++;
+      const pct = Math.round((LS.shotsMade / LS.shotsAtt) * 100);
+      const cls = pct >= 40 ? 'text-green-400' : 'text-red-400';
+      lsSet('ls-fg', `${LS.shotsMade}/${LS.shotsAtt} (${pct}%)`, cls);
+
+      // Flash the shot event on the video overlay
+      lsFlashShotEvent(made ? 'MADE!' : 'MISS', made ? '#22c55e' : '#ef4444');
+    }
+
+    function lsFlashShotEvent(text, color) {
+      const overlay = document.createElement('div');
+      overlay.style.cssText = `
+        position:absolute; inset:0; display:flex; align-items:center;
+        justify-content:center; pointer-events:none; z-index:30;`;
+      overlay.innerHTML = `<span style="font-size:2.5rem; font-weight:900; color:${color};
+        text-shadow:0 2px 8px rgba(0,0,0,0.8); opacity:1; transition:opacity 1.5s ease;">
+        ${text}</span>`;
+      const area = document.getElementById('ls-video').parentElement;
+      area.appendChild(overlay);
+      setTimeout(() => { overlay.querySelector('span').style.opacity = '0'; }, 300);
+      setTimeout(() => { area.removeChild(overlay); }, 1800);
+    }
+
+    function lsShowCue(text, severity, detail) {
+      if (!LS.active) return;
+
+      // Add current banner to history first
+      const prevText = document.getElementById('ls-cue-text').textContent;
+      if (prevText) {
+        LS.cueHistory.unshift(prevText);
+        lsRenderCueHistory();
+      }
+
+      const banner = document.getElementById('ls-cue-banner');
+      const colors = {
+        success: 'bg-green-500 border-green-400',
+        warning: 'bg-orange-500 border-orange-400',
+        info:    'bg-blue-500  border-blue-400',
+      };
+      banner.className = `rounded-xl border px-4 py-3 shadow-2xl ls-cue-anim max-w-md w-full ${colors[severity] || colors.info}`;
+      document.getElementById('ls-cue-text').textContent = text;
+      banner.classList.remove('hidden');
+      banner.title = detail;
+
+      // Auto-dismiss after 4s
+      lsTimeout(() => {
+        if (!LS.active) return;
+        LS.cueHistory.unshift(text);
+        lsRenderCueHistory();
+        banner.classList.add('hidden');
+      }, 4000);
+    }
+
+    function lsRenderCueHistory() {
+      const hist = LS.cueHistory.slice(0, 3);
+      document.getElementById('ls-cue-history').innerHTML = hist.map(t =>
+        `<div class="text-xs bg-black/50 text-gray-300 px-2 py-1 rounded backdrop-blur-sm w-fit">${t}</div>`
+      ).join('');
+    }
+
+    function lsSet(id, text, cls) {
+      const el = document.getElementById(id);
+      el.textContent = text;
+      el.className = `font-mono font-bold text-base ${cls}`;
+    }
+  </script>
+</body>
+</html>

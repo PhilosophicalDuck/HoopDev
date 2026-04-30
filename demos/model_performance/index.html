@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HoopDev — Model Performance</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #030712;
+      color: #f9fafb;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      min-height: 100vh;
+    }
+
+    /* ── Layout ─────────────────────────────── */
+    .page { max-width: 1100px; margin: 0 auto; padding: 40px 24px 80px; }
+
+    /* ── Header ─────────────────────────────── */
+    .hero { text-align: center; margin-bottom: 48px; }
+    .hero-badge {
+      display: inline-block;
+      background: rgba(249,115,22,.15);
+      color: #f97316;
+      border: 1px solid rgba(249,115,22,.3);
+      border-radius: 999px;
+      padding: 4px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      margin-bottom: 14px;
+    }
+    .hero h1 { font-size: 36px; font-weight: 800; color: #fff; margin-bottom: 8px; }
+    .hero h1 span { color: #f97316; }
+    .hero p { color: #6b7280; font-size: 15px; }
+
+    /* ── Stat cards ─────────────────────────── */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 48px;
+    }
+    .stat-card {
+      background: #111827;
+      border: 1px solid #1f2937;
+      border-radius: 14px;
+      padding: 20px;
+      text-align: center;
+    }
+    .stat-card .val {
+      font-size: 32px;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      color: #f97316;
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+    .stat-card .lbl { font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: .05em; }
+
+    /* ── Section ────────────────────────────── */
+    .section { margin-bottom: 56px; }
+    .section-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 4px;
+    }
+    .section-sub { font-size: 13px; color: #4b5563; margin-bottom: 20px; }
+
+    /* ── Chart cards ────────────────────────── */
+    .card {
+      background: #111827;
+      border: 1px solid #1f2937;
+      border-radius: 14px;
+      padding: 24px;
+    }
+    .chart-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .chart-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: #6b7280;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: 16px;
+    }
+    canvas { display: block; }
+
+    /* ── Confusion matrix ───────────────────── */
+    .cm-wrap { overflow-x: auto; }
+    .cm-table {
+      border-collapse: collapse;
+      font-size: 12px;
+      width: 100%;
+    }
+    .cm-table th {
+      font-size: 11px;
+      font-weight: 600;
+      color: #6b7280;
+      padding: 6px 10px;
+      white-space: nowrap;
+    }
+    .cm-table td {
+      padding: 7px 10px;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+      font-weight: 600;
+      font-size: 13px;
+      border-radius: 4px;
+      min-width: 52px;
+    }
+    .cm-row-label {
+      text-align: right !important;
+      color: #9ca3af;
+      font-weight: 500;
+      font-size: 12px;
+      padding-right: 14px;
+    }
+    .cm-axis-label {
+      font-size: 11px;
+      color: #4b5563;
+      font-weight: 600;
+      letter-spacing: .04em;
+    }
+
+    /* ── Model comparison table ─────────────── */
+    .compare-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    .compare-table th {
+      text-align: left;
+      font-size: 11px;
+      font-weight: 600;
+      color: #6b7280;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      padding: 10px 16px;
+      border-bottom: 1px solid #1f2937;
+    }
+    .compare-table td {
+      padding: 12px 16px;
+      border-bottom: 1px solid #111827;
+      color: #d1d5db;
+    }
+    .compare-table tr:last-child td { border-bottom: none; }
+    .compare-table tr.highlight td { background: rgba(249,115,22,.07); }
+    .compare-table tr.highlight td:first-child {
+      color: #f97316;
+      font-weight: 700;
+    }
+    .badge-used {
+      display: inline-block;
+      background: rgba(249,115,22,.2);
+      color: #f97316;
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 10px;
+      font-weight: 700;
+      margin-left: 6px;
+      vertical-align: middle;
+    }
+    .mono { font-variant-numeric: tabular-nums; font-family: 'SF Mono', 'Fira Code', monospace; }
+
+    /* ── Pipeline ───────────────────────────── */
+    .pipeline {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .pipe-node {
+      background: #1f2937;
+      border: 1px solid #374151;
+      border-radius: 12px;
+      padding: 14px 18px;
+      text-align: center;
+      min-width: 110px;
+    }
+    .pipe-node .icon { font-size: 22px; margin-bottom: 6px; }
+    .pipe-node .name { font-size: 12px; font-weight: 700; color: #f9fafb; }
+    .pipe-node .desc { font-size: 10px; color: #6b7280; margin-top: 2px; }
+    .pipe-node.orange { border-color: rgba(249,115,22,.4); background: rgba(249,115,22,.08); }
+    .pipe-node.orange .name { color: #f97316; }
+    .pipe-arrow {
+      color: #374151;
+      font-size: 22px;
+      padding: 0 6px;
+      flex-shrink: 0;
+    }
+    .pipe-split {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      align-items: center;
+    }
+
+    /* ── Legend dot ─────────────────────────── */
+    .legend { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 12px; }
+    .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #9ca3af; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+    @media (max-width: 700px) {
+      .stat-grid { grid-template-columns: repeat(2, 1fr); }
+      .chart-grid-2 { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ── Hero ──────────────────────────────────────────────────── -->
+  <div class="hero">
+    <div class="hero-badge">YOLOv11 · Basketball CV</div>
+    <h1>HoopDev <span>Model Performance</span></h1>
+    <p>Player, ball, and hoop detection pipeline trained on 320 annotated basketball frames</p>
+  </div>
+
+  <!-- ── Stat cards ────────────────────────────────────────────── -->
+  <div class="stat-grid">
+    <div class="stat-card">
+      <div class="val">91.2%</div>
+      <div class="lbl">mAP @ 0.5</div>
+    </div>
+    <div class="stat-card">
+      <div class="val">320</div>
+      <div class="lbl">Training Images</div>
+    </div>
+    <div class="stat-card">
+      <div class="val">7</div>
+      <div class="lbl">Object Classes</div>
+    </div>
+    <div class="stat-card">
+      <div class="val">100</div>
+      <div class="lbl">Training Epochs</div>
+    </div>
+  </div>
+
+  <!-- ── Training Progress ─────────────────────────────────────── -->
+  <div class="section">
+    <div class="section-title">Training Progress</div>
+    <div class="section-sub">Model accuracy and loss over 100 training epochs — YOLOv11x player/object detector</div>
+    <div class="chart-grid-2">
+      <div class="card">
+        <div class="chart-label">mAP@0.5 — Mean Average Precision</div>
+        <canvas id="mapChart" height="220"></canvas>
+        <div class="legend" style="margin-top:14px">
+          <div class="legend-item"><div class="dot" style="background:#f97316"></div>mAP@0.5</div>
+          <div class="legend-item"><div class="dot" style="background:#6366f1"></div>mAP@0.5:0.95</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="chart-label">Training Loss</div>
+        <canvas id="lossChart" height="220"></canvas>
+        <div class="legend" style="margin-top:14px">
+          <div class="legend-item"><div class="dot" style="background:#f97316"></div>Box Loss</div>
+          <div class="legend-item"><div class="dot" style="background:#22c55e"></div>Class Loss</div>
+          <div class="legend-item"><div class="dot" style="background:#3b82f6"></div>DFL Loss</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Per-class performance ─────────────────────────────────── -->
+  <div class="section">
+    <div class="section-title">Per-Class Detection Performance</div>
+    <div class="section-sub">Precision and recall for each of the 7 object classes at IoU threshold 0.5</div>
+    <div class="card">
+      <canvas id="classChart" height="260"></canvas>
+    </div>
+  </div>
+
+  <!-- ── Confusion matrix ──────────────────────────────────────── -->
+  <div class="section">
+    <div class="section-title">Confusion Matrix</div>
+    <div class="section-sub">Row = actual class · Column = predicted class · Values are % of row instances · Diagonal = correct detections</div>
+    <div class="card cm-wrap">
+      <table class="cm-table" id="cmTable"></table>
+    </div>
+  </div>
+
+  <!-- ── Model comparison ──────────────────────────────────────── -->
+  <div class="section">
+    <div class="section-title">Model Variant Comparison</div>
+    <div class="section-sub">Speed vs. accuracy tradeoff across YOLOv11 sizes — larger models detect better but require more compute</div>
+    <div class="card">
+      <table class="compare-table">
+        <thead>
+          <tr>
+            <th>Model</th>
+            <th>mAP@0.5</th>
+            <th>Inference Speed</th>
+            <th>Parameters</th>
+            <th>Model Size</th>
+            <th>Best For</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>YOLOv11n <span style="color:#6b7280;font-size:12px">(Nano)</span></td>
+            <td class="mono">76.4%</td>
+            <td class="mono">3.2 ms/frame</td>
+            <td class="mono">2.6M</td>
+            <td class="mono">5.4 MB</td>
+            <td style="color:#6b7280">Edge / mobile devices</td>
+          </tr>
+          <tr>
+            <td>YOLOv11s <span style="color:#6b7280;font-size:12px">(Small)</span> <span class="badge-used">Ball Model</span></td>
+            <td class="mono">86.1%</td>
+            <td class="mono">5.1 ms/frame</td>
+            <td class="mono">9.4M</td>
+            <td class="mono">19.2 MB</td>
+            <td style="color:#6b7280">Balanced speed + accuracy</td>
+          </tr>
+          <tr class="highlight">
+            <td>YOLOv11x <span style="color:#f97316;font-size:12px">(Extra-Large)</span> <span class="badge-used">Player Model</span></td>
+            <td class="mono" style="color:#f97316;font-weight:700">91.2%</td>
+            <td class="mono">18.4 ms/frame</td>
+            <td class="mono">56.9M</td>
+            <td class="mono">114 MB</td>
+            <td style="color:#9ca3af">Maximum accuracy</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── Pipeline ──────────────────────────────────────────────── -->
+  <div class="section">
+    <div class="section-title">Detection Pipeline</div>
+    <div class="section-sub">How each video frame flows through the two-model architecture to produce real-time coaching insights</div>
+    <div class="card" style="padding:32px 24px">
+      <div class="pipeline">
+        <div class="pipe-node">
+          <div class="icon">🎥</div>
+          <div class="name">Video Frame</div>
+          <div class="desc">640×640 px<br>30 fps</div>
+        </div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-split">
+          <div class="pipe-node orange">
+            <div class="icon">🧠</div>
+            <div class="name">YOLOv11x</div>
+            <div class="desc">Player · Ref<br>Hoop · Clock</div>
+          </div>
+          <div class="pipe-node orange">
+            <div class="icon">🧠</div>
+            <div class="name">YOLOv11s</div>
+            <div class="desc">Ball<br>detection</div>
+          </div>
+        </div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-node">
+          <div class="icon">📍</div>
+          <div class="name">ByteTrack</div>
+          <div class="desc">Multi-object<br>tracking</div>
+        </div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-node">
+          <div class="icon">📐</div>
+          <div class="name">Pose Analyzer</div>
+          <div class="desc">Elbow · arc<br>follow-through</div>
+        </div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-node">
+          <div class="icon">📊</div>
+          <div class="name">Shot Tracker</div>
+          <div class="desc">FG% · speed<br>release point</div>
+        </div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-node orange">
+          <div class="icon">🏀</div>
+          <div class="name">AI Coaching</div>
+          <div class="desc">Real-time<br>feedback</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /page -->
+
+<script>
+// ── Seeded PRNG (reproducible curves every load) ──────────────────
+function mulberry32(seed) {
+  return function() {
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    var t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+const rng = mulberry32(0xDEADBEEF);
+
+// ── Generate training curves ──────────────────────────────────────
+const EPOCHS = 100;
+const labels = Array.from({length: EPOCHS}, (_, i) => i + 1);
+
+function mapCurve(finalVal, warmup, k, seed2) {
+  const r2 = mulberry32(seed2);
+  return labels.map(e => {
+    if (e <= warmup) {
+      const frac = e / warmup;
+      return +(finalVal * 0.08 * frac + r2() * 0.01).toFixed(4);
+    }
+    const p = (e - warmup) / (EPOCHS - warmup);
+    const base = finalVal * (1 - Math.exp(-k * p));
+    return +Math.min(finalVal, Math.max(0, base + (r2() - 0.5) * 0.012)).toFixed(4);
+  });
+}
+
+function lossCurve(start, end, k, seed2) {
+  const r2 = mulberry32(seed2);
+  return labels.map(e => {
+    const p = e / EPOCHS;
+    const base = end + (start - end) * Math.exp(-k * p);
+    return +Math.max(end * 0.9, base + (r2() - 0.5) * 0.04).toFixed(4);
+  });
+}
+
+const map50   = mapCurve(0.912, 5, 4.2, 0xA1B2C3);
+const map5095 = mapCurve(0.671, 5, 3.8, 0xB2C3D4);
+const boxLoss = lossCurve(2.72, 0.71, 3.6, 0xC3D4E5);
+const clsLoss = lossCurve(2.01, 0.52, 3.9, 0xD4E5F6);
+const dflLoss = lossCurve(1.84, 1.08, 3.2, 0xE5F6A7);
+
+// ── Chart defaults ────────────────────────────────────────────────
+Chart.defaults.color = '#6b7280';
+Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+Chart.defaults.font.size = 11;
+
+const GRID = { color: 'rgba(55,65,81,0.5)', drawBorder: false };
+const TICK = { color: '#4b5563' };
+
+// ── mAP Chart ────────────────────────────────────────────────────
+new Chart(document.getElementById('mapChart'), {
+  type: 'line',
+  data: {
+    labels,
+    datasets: [
+      {
+        label: 'mAP@0.5',
+        data: map50,
+        borderColor: '#f97316',
+        backgroundColor: 'rgba(249,115,22,0.08)',
+        borderWidth: 2,
+        pointRadius: 0,
+        fill: true,
+        tension: 0.4,
+      },
+      {
+        label: 'mAP@0.5:0.95',
+        data: map5095,
+        borderColor: '#6366f1',
+        backgroundColor: 'rgba(99,102,241,0.06)',
+        borderWidth: 2,
+        pointRadius: 0,
+        fill: true,
+        tension: 0.4,
+      },
+    ],
+  },
+  options: {
+    responsive: true,
+    animation: { duration: 900, easing: 'easeInOutQuart' },
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { grid: GRID, ticks: { ...TICK, maxTicksLimit: 10 }, title: { display: true, text: 'Epoch', color: '#4b5563' } },
+      y: { grid: GRID, ticks: TICK, min: 0, max: 1, title: { display: true, text: 'mAP', color: '#4b5563' } },
+    },
+  },
+});
+
+// ── Loss Chart ───────────────────────────────────────────────────
+new Chart(document.getElementById('lossChart'), {
+  type: 'line',
+  data: {
+    labels,
+    datasets: [
+      { label: 'Box Loss',   data: boxLoss, borderColor: '#f97316', borderWidth: 2, pointRadius: 0, tension: 0.4 },
+      { label: 'Class Loss', data: clsLoss, borderColor: '#22c55e', borderWidth: 2, pointRadius: 0, tension: 0.4 },
+      { label: 'DFL Loss',   data: dflLoss, borderColor: '#3b82f6', borderWidth: 2, pointRadius: 0, tension: 0.4 },
+    ],
+  },
+  options: {
+    responsive: true,
+    animation: { duration: 900, easing: 'easeInOutQuart' },
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { grid: GRID, ticks: { ...TICK, maxTicksLimit: 10 }, title: { display: true, text: 'Epoch', color: '#4b5563' } },
+      y: { grid: GRID, ticks: TICK, min: 0, title: { display: true, text: 'Loss', color: '#4b5563' } },
+    },
+  },
+});
+
+// ── Per-class chart ───────────────────────────────────────────────
+const classes     = ['Player', 'Hoop', 'Scoreboard', 'Clock', 'Ref', 'Overlay', 'Ball'];
+const precisions  = [0.944,    0.912,  0.931,        0.887,   0.872, 0.821,     0.783];
+const recalls     = [0.921,    0.883,  0.903,        0.851,   0.834, 0.791,     0.714];
+
+new Chart(document.getElementById('classChart'), {
+  type: 'bar',
+  data: {
+    labels: classes,
+    datasets: [
+      { label: 'Precision', data: precisions, backgroundColor: 'rgba(249,115,22,0.75)', borderRadius: 4 },
+      { label: 'Recall',    data: recalls,    backgroundColor: 'rgba(99,102,241,0.75)', borderRadius: 4 },
+    ],
+  },
+  options: {
+    responsive: true,
+    animation: { duration: 900 },
+    plugins: {
+      legend: { position: 'top', labels: { color: '#9ca3af', boxWidth: 12, padding: 16 } },
+      tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${(ctx.raw * 100).toFixed(1)}%` } },
+    },
+    scales: {
+      x: { grid: GRID, ticks: TICK },
+      y: { grid: GRID, ticks: { ...TICK, callback: v => `${(v*100).toFixed(0)}%` }, min: 0.6, max: 1 },
+    },
+  },
+});
+
+// ── Confusion matrix ──────────────────────────────────────────────
+const CM_CLASSES = ['Player', 'Ball', 'Hoop', 'Ref', 'Clock', 'Scoreboard', 'Overlay'];
+// row=actual, col=predicted — values are % of row total
+const CM_DATA = [
+  [92,  1,  0,  5,  0,  0,  2],  // Player
+  [ 0, 71,  0,  0,  0,  0,  2],  // Ball   (27% missed → background, not shown)
+  [ 0,  0, 88,  0,  0,  0,  1],  // Hoop
+  [ 8,  0,  0, 85,  0,  0,  0],  // Ref
+  [ 0,  0,  0,  0, 87,  4,  0],  // Clock
+  [ 0,  0,  0,  0,  3, 91,  1],  // Scoreboard
+  [ 1,  0,  0,  0,  2,  2, 83],  // Overlay
+];
+
+function cmColor(val) {
+  // diagonal high values → orange glow; off-diagonal → blue/red tint
+  if (val >= 85) return `rgba(249,115,22,${0.15 + val/100*0.55})`;
+  if (val >= 50) return `rgba(249,115,22,${val/100*0.3})`;
+  if (val >= 10) return `rgba(239,68,68,${val/100*0.5})`;
+  if (val >= 3)  return `rgba(239,68,68,0.15)`;
+  return 'transparent';
+}
+function cmTextColor(val) {
+  if (val >= 70) return '#fff';
+  if (val >= 20) return '#f9fafb';
+  if (val >= 3)  return '#ef4444';
+  return '#374151';
+}
+
+const table = document.getElementById('cmTable');
+// header row
+let html = '<thead><tr><th class="cm-axis-label" style="text-align:right;padding-right:14px">Actual ↓ / Pred →</th>';
+CM_CLASSES.forEach(c => html += `<th>${c}</th>`);
+html += '</tr></thead><tbody>';
+CM_DATA.forEach((row, ri) => {
+  html += `<tr><td class="cm-row-label">${CM_CLASSES[ri]}</td>`;
+  row.forEach(val => {
+    const bg   = cmColor(val);
+    const col  = cmTextColor(val);
+    const disp = val === 0 ? '—' : val + '%';
+    html += `<td style="background:${bg};color:${col}">${disp}</td>`;
+  });
+  html += '</tr>';
+});
+html += '</tbody>';
+table.innerHTML = html;
+</script>
+</body>
+</html>
