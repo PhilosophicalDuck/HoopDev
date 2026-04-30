@@ -230,7 +230,16 @@ models/
 └── yolo11n-pose.pt          ← auto-downloaded on first run if missing
 ```
 
-### 4. Install and run the frontend
+### 4. Download demo videos (optional)
+
+Only needed if you want to use the in-app demo mode (`/session/demo`). Download the following files from the [Releases page](https://github.com/PhilosophicalDuck/HoopDev/releases/tag/v1.0) and place them in `app/frontend/public/demo/`:
+
+- `shooting_h264.mp4`
+- `dribbling_h264.mp4`
+
+The rest of the app works fine without them — the demo page is just a preview that plays pre-recorded footage.
+
+### 5. Install and run the frontend
 
 ```bash
 cd app/frontend
@@ -238,7 +247,7 @@ npm install
 npm run dev
 ```
 
-### 5. Run the backend
+### 6. Run the backend
 
 ```bash
 # From the repo root
